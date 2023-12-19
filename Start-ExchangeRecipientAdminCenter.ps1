@@ -91,7 +91,7 @@ try
 					}
 					try
 					{
-						$Result = Enable-RemoteMailbox -Identity $Table['username'] -PrimarySMTPAddress "$($Table['primarysmtpaddress_local'])@$($Table['primarysmtpaddress_accepteddomain'])" -RemoteRoutingAddress "$($Table['remoteroutingaddress_local'])@$($Table['remoteroutingaddress_accepteddomain'])"
+						$Result = Enable-RemoteMailbox -Identity $Table['username'] -PrimarySMTPAddress "$($Table['primarysmtpaddress_local'])@$($Table['primarysmtpaddress_accepteddomain'])" -RemoteRoutingAddress "$($Table['remoteroutingaddress_local'])@$($Table['remoteroutingaddress_accepteddomain'])" -ErrorAction Stop
 						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "User $($Table['username']) enabled as Remote Mailbox")
 					}
 					catch
@@ -251,7 +251,7 @@ try
 					}
 					try
 					{
-						$Result = New-AcceptedDomain -Name $Table['addacceptedomain_friendlyname'] -DomainName $Table['addacceptedomain_domainname'] -DomainType $Table['addacceptedomain_domaintype']
+						$Result = New-AcceptedDomain -Name $Table['addacceptedomain_friendlyname'] -DomainName $Table['addacceptedomain_domainname'] -DomainType $Table['addacceptedomain_domaintype'] -ErrorAction Stop
 						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) was added as Accepted Domain of type $($table['addacceptedomain_domaintype']) ")
 					}
 					catch
@@ -362,7 +362,7 @@ try
 					{
 						# retrieve error message on error
 						$RESULT += "`nError while downloading '$CHECKFILE'`n`n"
-						$RESULT += $Error[0]
+						$RESULT += $Error[0].Exception.InnerException
 						$Error.Clear()
 					}
 				}
