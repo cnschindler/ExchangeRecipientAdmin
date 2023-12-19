@@ -252,7 +252,7 @@ try
 					try
 					{
 						$Result = New-AcceptedDomain -Name $Table['addacceptedomain_friendlyname'] -DomainName $Table['addacceptedomain_domainname'] -DomainType $Table['addacceptedomain_domaintype']
-						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) added as $($table['addacceptedomain_domaintype']) Accepted Domain")
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) was added as Accepted Domain of type $($table['addacceptedomain_domaintype']) ")
 					}
 					catch
 					{
@@ -275,7 +275,7 @@ try
 				}
 
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\accepteddomains.html").Replace("<!-- {row} -->", $HTMLROWS)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\accepteddomains.html").Replace("<!-- {row} -->", $HTMLROWS).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
