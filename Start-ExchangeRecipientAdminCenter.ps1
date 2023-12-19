@@ -19,13 +19,14 @@ Based on: https://github.com/MScholtes/WebServer
 #>
 
 
-if (!(Get-PSSnapIn Microsoft.Exchange.Management.PowerShell.RecipientManagement -Registered -ErrorAction SilentlyContinue)) {
+if (!(Get-PSSnapin Microsoft.Exchange.Management.PowerShell.RecipientManagement -Registered -ErrorAction SilentlyContinue))
+{
 	throw "Please install the Exchange 2019 CU12 and above Management Tools-Only install. See: https://docs.microsoft.com/en-us/Exchange/manage-hybrid-exchange-recipients-with-management-tools"
 	break
 }
 
 # Load Recipient Management PowerShell Tools
-Add-PSSnapIn Microsoft.Exchange.Management.PowerShell.RecipientManagement
+Add-PSSnapin Microsoft.Exchange.Management.PowerShell.RecipientManagement
 
 # Define webserver details
 $BASEDIR = $PSScriptRoot + "/web"
@@ -48,10 +49,12 @@ $Error.Clear()
 
 Start-Process -FilePath $BINDING
 
-try {
+try
+{
 	"$(Get-Date -Format s) Powershell webserver started."
 	$WEBLOG = "$(Get-Date -Format s) Powershell webserver started.`n"
-	while ($LISTENER.IsListening) {
+	while ($LISTENER.IsListening)
+	{
 		# analyze incoming request
 		$CONTEXT = $LISTENER.GetContext()
 		$REQUEST = $CONTEXT.Request
@@ -64,28 +67,35 @@ try {
 		$WEBLOG += "$(Get-Date -Format s) $($REQUEST.RemoteEndPoint.Address.ToString()) $($REQUEST.httpMethod) $($REQUEST.Url.PathAndQuery)`n"
 		$RECEIVED = '{0} {1}' -f $REQUEST.httpMethod, $REQUEST.Url.LocalPath
 		# check for known commands
-		switch ($RECEIVED) {
+		switch ($RECEIVED)
+		{
 			
-			"GET /" { 
+			"GET /"
+   { 
 				# Return the dashboard homepage
 				$HTMLRESPONSE = Get-Content -Path "$($BASEDIR)\index.html"
 				break
 			}
 
-			"GET /remotemailboxes" { 
+			"GET /remotemailboxes"
+			{ 
 				# Remote Mailbox Section
 				
 				# Process submitted form
-				if ($REQUEST.Url.Query) {
+				if ($REQUEST.Url.Query)
+				{
 					$Table = @{}
-					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&")) {
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
 						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
 					}
-					try {
+					try
+					{
 						$Result = Enable-RemoteMailbox -Identity $Table['username'] -PrimarySMTPAddress "$($Table['primarysmtpaddress_local'])@$($Table['primarysmtpaddress_accepteddomain'])" -RemoteRoutingAddress "$($Table['remoteroutingaddress_local'])@$($Table['remoteroutingaddress_accepteddomain'])"
 						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "User $($Table['username']) enabled as Remote Mailbox")
 					}
-					catch {
+					catch
+					{
 						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
 					}
 					
@@ -93,37 +103,45 @@ try {
 
 				# Prepare user list for non-Exchange users
 				$HTMLROWS_USERS = ""
-				foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where { $_.UserPrincipalName })) {
+				foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
+				{
 					$HTMLROWS_USERS += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
 				}
 
 				# Prepare accepted domain list
 				$HTMLROWS_AD = ""
-				foreach ($Item in (Get-AcceptedDomain)) {
+				foreach ($Item in (Get-AcceptedDomain))
+				{
 					
-					if ($Item.Default) {
+					if ($Item.Default)
+     {
 						$HTMLROWS_AD += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
 					}
-					else {
+					else
+					{
 						$HTMLROWS_AD += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
 					}
 				}
 
 				# Prepare remote routing domain list
 				$HTMLROWS_RRA = ""
-				foreach ($Item in (Get-AcceptedDomain)) {
+				foreach ($Item in (Get-AcceptedDomain))
+				{
 					
-					if ($Item.DomainName -like "*.mail.onmicrosoft.com") {
+					if ($Item.DomainName -like "*.mail.onmicrosoft.com")
+     {
 						$HTMLROWS_RRA += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
 					}
-					else {
+					else
+					{
 						$HTMLROWS_RRA += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
 					}
 				}
 
 				# Return remote mailbox list
 				$HTMLROWS_MBX = ""
-				foreach ($Item in (Get-RemoteMailbox | Select DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged)) {
+				foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
+				{
 					$HTMLROWS_MBX += "
 					<tr>
 					<th scope=`"row`">
@@ -131,7 +149,7 @@ try {
 					<td>$($Item.PrimarySMTPAddress)</td>
 					<td>$($Item.RecipientTypeDetails)</td>
 					<td>$($Item.WhenChanged)</td>
-					</tr>";
+					</tr>"
 				}
 
 				# Create response and replace template placeholders
@@ -139,30 +157,34 @@ try {
 				break
 			}
 
-			"GET /distributiongroups" { 
+			"GET /distributiongroups"
+			{ 
 				# Distribution Groups Section
 
 				# Prepare Distibution Group lists split into tabs
 				$HTMLROWS_DL = ""
 				$HTMLROWS_MES = ""
-				foreach ($Item in (Get-DistributionGroup | Select DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated)) {
-					if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup") {
+				foreach ($Item in (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated))
+				{
+					if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup")
+					{
 						$HTMLROWS_DL += "
 						<tr>
 						<th scope=`"row`">
 						<a href=`"#`">$($Item.DisplayName)</a></th>
 						<td>$($Item.PrimarySMTPAddress)</td>
 						<td>$($Item.WhenCreated)</td>
-						</tr>";
+						</tr>"
 					}
-					elseif ($Item.RecipientTypeDetails -eq "MailUniversalSecurityGroup") {
+					elseif ($Item.RecipientTypeDetails -eq "MailUniversalSecurityGroup")
+					{
 						$HTMLROWS_MES += "
 						<tr>
 						<th scope=`"row`">
 						<a href=`"#`">$($Item.DisplayName)</a></th>
 						<td>$($Item.PrimarySMTPAddress)</td>
 						<td>$($Item.WhenCreated)</td>
-						</tr>";
+						</tr>"
 					}
 				}
 
@@ -171,19 +193,21 @@ try {
 				break
 			}
 			
-			"GET /contacts" { 
+			"GET /contacts"
+   { 
 				# Mail Contacts Section
 
 				# Prepare contacts list
 				$HTMLROWS = ""
-				foreach ($Item in (Get-MailContact | Select DisplayName, PrimarySMTPAddress, RecipientType)) {
+				foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
+				{
 					$HTMLROWS += "
 					<tr>
 					<th scope=`"row`">
 					<a href=`"#`">$($Item.DisplayName)</a></th>
 					<td>$($Item.PrimarySMTPAddress)</td>
 					<td>$($Item.RecipientType)</td>
-					</tr>";
+					</tr>"
 				}
 
 				# Create response and replace template placeholders
@@ -191,19 +215,21 @@ try {
 				break
 			}
 
-			"GET /emailaddresspolicies" { 
+			"GET /emailaddresspolicies"
+			{ 
 				# Email Address Policies Section
 
 				# Prepare email address policies list
 				$HTMLROWS = ""
-				foreach ($Item in (Get-EmailAddressPolicy | Select Name, Priority, RecipientFilter)) {
+				foreach ($Item in (Get-EmailAddressPolicy | Select-Object Name, Priority, RecipientFilter))
+				{
 					$HTMLROWS += "
 					<tr>
 					<th scope=`"row`">
 					<a href=`"#`">$($Item.Name)</a></th>
 					<td>$($Item.Priority)</td>
 					<td>$($Item.RecipientFilter)</td>
-					</tr>";
+					</tr>"
 				}
 
 				# Create response and replace template placeholders
@@ -211,19 +237,41 @@ try {
 				break
 			}
 
-			"GET /accepteddomains" { 
+			"GET /accepteddomains"
+			{ 
 				# Accepted Domains section
+
+				# Process submitted form
+				if ($REQUEST.Url.Query)
+				{
+					$Table = @{}
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
+						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
+					}
+					try
+					{
+						$Result = New-AcceptedDomain -Name $Table['addacceptedomain_friendlyname'] -DomainName $Table['addacceptedomain_domainname'] -DomainType $Table['addacceptedomain_domaintype']
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) added as $($table['addacceptedomain_domaintype']) Accepted Domain")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
+				}
 
 				# Prepare list of accepted domains
 				$HTMLROWS = ""
-				foreach ($Item in (Get-AcceptedDomain)) {
+				foreach ($Item in (Get-AcceptedDomain))
+				{
 					$HTMLROWS += "
 					<tr>
 					<th scope=`"row`">
 					<a href=`"#`">$($Item.Name)</a></th>
 					<td>$($Item.DomainName)</td>
 					<td>$($Item.DomainType)</td>
-					</tr>";
+					</tr>"
 				}
 
 				# Create response and replace template placeholders
@@ -231,13 +279,15 @@ try {
 				break
 			}
 
-			"GET /exit" { 
+			"GET /exit"
+			{ 
 				# Create response preparing for webserver shutdown
 				$HTMLRESPONSE = "<!doctype html><html><body>Please close the browser window</body></html>"
 				break
 			}
 
-			default {	
+			default
+			{	
 					
 				# PowerShell webserver main code - this section should be updated if the main project is
 					
@@ -246,44 +296,53 @@ try {
 				# create physical path based upon the base dir and url
 				$CHECKDIR = $BASEDIR.TrimEnd("/\") + $REQUEST.Url.LocalPath
 				$CHECKFILE = ""
-				if (Test-Path $CHECKDIR -PathType Container) {
+				if (Test-Path $CHECKDIR -PathType Container)
+				{
 					# physical path is a directory
 					$INDEX = "/index.html"
 					$CHECKFILE = $CHECKDIR.TrimEnd("/\") + $INDEX
-					if (Test-Path $CHECKFILE -PathType Leaf) {
+					if (Test-Path $CHECKFILE -PathType Leaf)
+					{
 						# index file found, path now in $CHECKFILE
 						break
 					}
 					$CHECKFILE = ""
 						
-					if ($CHECKFILE -eq "") {
+					if ($CHECKFILE -eq "")
+					{
 						# do not generate directory listing - 404 
 						# no file to serve found, return error
 						$RESPONSE.StatusCode = 404
 						$HTMLRESPONSE = "<!doctype html><html><body>Page $($RECEIVED) not found</body></html>"
 					}
 				}
-				else {
+				else
+				{
 					# no directory, check for file
-					if (Test-Path $CHECKDIR -PathType Leaf) {
+					if (Test-Path $CHECKDIR -PathType Leaf)
+					{
 						# file found, path now in $CHECKFILE
 						$CHECKFILE = $CHECKDIR
 					}
 				}
 
-				if ($CHECKFILE -ne "") {
+				if ($CHECKFILE -ne "")
+				{
 					# static content available
-					try {
+					try
+					{
 						# ... serve static content
 						$BUFFER = [System.IO.File]::ReadAllBytes($CHECKFILE)
 						$RESPONSE.ContentLength64 = $BUFFER.Length
 						$RESPONSE.SendChunked = $FALSE
 						$EXTENSION = [IO.Path]::GetExtension($CHECKFILE)
-						if ($MIMEHASH.ContainsKey($EXTENSION)) {
+						if ($MIMEHASH.ContainsKey($EXTENSION))
+						{
 							# known mime type for this file's extension available
 							$RESPONSE.ContentType = $MIMEHASH.Item($EXTENSION)
 						}
-						else {
+						else
+						{
 							# no, serve as binary download
 							$RESPONSE.ContentType = "application/octet-stream"
 							$FILENAME = Split-Path -Leaf $CHECKFILE
@@ -295,19 +354,23 @@ try {
 						# mark response as already given
 						$RESPONSEWRITTEN = $TRUE
 					}
-					catch {
+					catch
+					{
 						# just ignore. Error handling comes afterwards since not every error throws an exception
 					}
-					if ($Error.Count -gt 0) {
+					if ($Error.Count -gt 0)
+					{
 						# retrieve error message on error
 						$RESULT += "`nError while downloading '$CHECKFILE'`n`n"
 						$RESULT += $Error[0]
 						$Error.Clear()
 					}
 				}
-				else {
+				else
+				{
 					# no file to serve found, return error
-					if (!(Test-Path $CHECKDIR -PathType Container)) {
+					if (!(Test-Path $CHECKDIR -PathType Container))
+					{
 						$RESPONSE.StatusCode = 404
 						$HTMLRESPONSE = "<!doctype html><html><body>Page $($RECEIVED) not found</body></html>"
 					}
@@ -316,7 +379,8 @@ try {
 		}
 
 		# only send response if not already done
-		if (!$RESPONSEWRITTEN) {
+		if (!$RESPONSEWRITTEN)
+		{
 			# return HTML answer to caller
 			$BUFFER = [Text.Encoding]::UTF8.GetBytes($HTMLRESPONSE)
 			$RESPONSE.ContentLength64 = $BUFFER.Length
@@ -329,14 +393,16 @@ try {
 		$RESPONSE.Close()
 
 		# If exit was chosen, break out of loop and exit
-		if ($RECEIVED -eq 'GET /exit') {
+		if ($RECEIVED -eq 'GET /exit')
+		{
 			# then break out of while loop
 			"$(Get-Date -Format s) Stopping powershell webserver..."
-			break;
+			break
 		}
 	}
 }
-finally {
+finally
+{
 	# Stop powershell webserver
 	$LISTENER.Stop()
 	$LISTENER.Close()
