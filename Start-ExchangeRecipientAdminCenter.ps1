@@ -49,6 +49,214 @@ $Error.Clear()
 
 Start-Process -FilePath $BINDING
 
+function Get-AcceptedDomains
+{
+	Param
+	(
+		[switch]$TableView,
+		[switch]$RemoteRouting
+	)
+
+	$AcceptedDomains = Get-AcceptedDomain | Select-Object Name, DomainName, DomainType
+
+	if ($RemoteRouting)
+	{
+		$AcceptedDomains = $AcceptedDomains | Where-Object DomainName -Match "mail.onmicrosoft.com"
+	}
+
+	if ($TableView)
+	{
+		foreach ($Item in $AcceptedDomains)
+		{
+			$AD_TableView += "
+			<tr>
+			<th scope=`"row`">
+			<a href=`"#`">$($Item.Name)</a></th>
+			<td>$($Item.DomainName)</td>
+			<td>$($Item.DomainType)</td>
+			</tr>"
+		}
+
+		Return $AD_TableView
+	}
+
+	else
+	{
+		foreach ($Item in $AcceptedDomains)
+		{
+			if ($Item.Default)
+			{
+				$AD_DropDown += "`n<option selected value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
+			}
+
+			else
+			{
+				$AD_DropDown += "`n<option value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
+			}
+		}
+
+		Return $AD_DropDown
+	}
+}
+
+function Get-NonMailboxUsers
+{
+	$NonMBXUsr = ""
+	foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
+	{
+		$NonMBXUsr += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
+	}
+
+	Return $NonMBXUsr
+
+}
+
+function Get-RemoteMailboxes
+{
+	$RemoteMBX = ""
+	foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
+	{
+		$RemoteMBX += "
+		<tr>
+		<th scope=`"row`">
+		<a href=`"/editremotemailbox?id=$($Item.PrimarySMTPAddress)`">$($Item.DisplayName)</a></th>
+		<td>$($Item.PrimarySMTPAddress)</td>
+		<td>$($Item.RecipientTypeDetails)</td>
+		<td>$($Item.WhenChanged)</td>
+		</tr>"
+	}
+}
+
+function Get-EmailAddressPolicies
+{
+	foreach ($Item in (Get-EmailAddressPolicy | Select-Object Name, Priority, RecipientFilter, RecipientContainer, EnabledEmailAddressTemplates))
+	{
+		$EAP += "
+		<tr>
+		<th scope=`"row`">
+		<a href=`"#`">$($Item.Name)</a></th>
+		<td>$($Item.Priority)</td>
+		<td>$($item.EnabledEmailAddressTemplates.AddressTemplateString)</td>
+		<td>$($Item.RecipientFilter)</td>
+		<td>$($Item.RecipientContainer)</td>
+		</tr>"
+	}
+
+	Return $EAP
+
+}
+
+function Get-ExternalRecipients
+{
+	Param
+	(
+		[switch]$MailUsers
+	)
+
+	if ($MailUsers)
+	{
+		$MailUsr = ""
+		foreach ($Item in (Get-MailUser | Select-Object DisplayName, PrimarySMTPAddress))
+		{
+			$MailUsr += "
+		<tr>
+		<th scope=`"row`">
+		<a href=`"#`">$($Item.DisplayName)</a></th>
+		<td>$($Item.PrimarySMTPAddress)</td>
+		</tr>"
+		}
+	
+		Return $MailUsr
+	}
+
+	else
+	{
+		$MailContacts = ""
+		foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress))
+		{
+			$MailContacts += "
+		<tr>
+		<th scope=`"row`">
+		<a href=`"#`">$($Item.DisplayName)</a></th>
+		<td>$($Item.PrimarySMTPAddress)</td>
+		</tr>"
+		}
+
+		Return $MailContacts
+	}
+}
+
+function Get-DistributionGroups
+{
+	Param
+	(
+		[switch]$Security
+	)
+
+	$AllGroups = (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated)
+
+	if ($Security)
+	{
+		$SecurityGroups = $AllGroups | Where-Object RecipientTypeDetails -EQ "MailUniversalSecurityGroup"
+
+		$SecGroups = ""
+		foreach ($group in $SecurityGroups)
+		{
+			$SecGroups += "
+			<tr>
+			<th scope=`"row`">
+			<a href=`"#`">$($group.DisplayName)</a></th>
+			<td>$($group.PrimarySMTPAddress)</td>
+			<td>$($group.WhenCreated)</td>
+			</tr>"
+		}
+
+		Return $SecGroups
+	}
+
+	else
+	{
+		$DistributionGroups = $AllGroups | Where-Object RecipientTypeDetails -EQ "MailUniversalDistributionGroup"
+
+		$DistGroups = ""
+		foreach ($group in $DistributionGroups)
+		{
+			$DistGroups += "
+			<tr>
+			<th scope=`"row`">
+			<a href=`"#`">$($group.DisplayName)</a></th>
+			<td>$($group.PrimarySMTPAddress)</td>
+			<td>$($group.WhenCreated)</td>
+			</tr>"
+		}
+
+		Return $DistGroups
+	}
+}
+
+function Get-NonMailGroups
+{
+	$NonMailGroups = Get-Group -Filter {(RecipientType -eq "Group") -and (RecipientTypeDetails -ne "NonUniversalGroup") -and (RecipientTypeDetails -ne "RoleGroup")}
+	$NonMailGroupsList
+	foreach ($group in $NonMailGroups)
+	{
+		$NonMailGroupsList += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
+	}
+
+	Return $NonMailGroupsList
+}
+
+$HTMLROWS_AD = Get-AcceptedDomains
+$HTMLLIST_AD = Get-AcceptedDomains -TableView
+$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
+$HTMLROWS_USERS = Get-NonMailboxUsers
+$HTMLROWS_MBX = Get-RemoteMailboxes
+$HTMLROWS_EAP = Get-EmailAddressPolicies
+$HTMLROWS_Contacts = Get-ExternalRecipients
+$HTMLROWS_Mailusers = Get-ExternalRecipients -MailUsers
+$HTMLROWS_DL = Get-DistributionGroups
+$HTMLROWS_MES = Get-DistributionGroups -Security
+$HTMLROWS_GROUPS	
 try
 {
 	"$(Get-Date -Format s) Powershell webserver started."
@@ -69,9 +277,9 @@ try
 		# check for known commands
 		switch ($RECEIVED)
 		{
-			
+
 			"GET /"
-   { 
+			{ 
 				# Return the dashboard homepage
 				$HTMLRESPONSE = Get-Content -Path "$($BASEDIR)\index.html"
 				break
@@ -102,55 +310,55 @@ try
 				}
 
 				# Prepare user list for non-Exchange users
-				$HTMLROWS_USERS = ""
-				foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
-				{
-					$HTMLROWS_USERS += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
-				}
+				#$HTMLROWS_USERS = ""
+				#foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
+				#{
+				#	$HTMLROWS_USERS += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
+				#}
 
 				# Prepare accepted domain list
-				$HTMLROWS_AD = ""
-				foreach ($Item in (Get-AcceptedDomain))
-				{
-					
-					if ($Item.Default)
-     {
-						$HTMLROWS_AD += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-					}
-					else
-					{
-						$HTMLROWS_AD += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-					}
-				}
+				#$HTMLROWS_AD = Get-AcceptedDomains
+				#				foreach ($Item in (Get-AcceptedDomain))
+				#				{
+				#					
+				#					if ($Item.Default)
+				#     {
+				#						$HTMLROWS_AD += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
+				#					}
+				#					else
+				#					{
+				#						$HTMLROWS_AD += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
+				#					}
+				#				}
 
 				# Prepare remote routing domain list
-				$HTMLROWS_RRA = ""
-				foreach ($Item in (Get-AcceptedDomain))
-				{
-					
-					if ($Item.DomainName -like "*.mail.onmicrosoft.com")
-     {
-						$HTMLROWS_RRA += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-					}
-					else
-					{
-						$HTMLROWS_RRA += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-					}
-				}
+				#$HTMLROWS_RRA = ""
+				#foreach ($Item in (Get-AcceptedDomain))
+				#{
+				#	
+				#	if ($Item.DomainName -like "*.mail.onmicrosoft.com")
+				#	{
+				#		$HTMLROWS_RRA += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
+				#	}
+				#	else
+				#	{
+				#		$HTMLROWS_RRA += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
+				#	}
+				#}
 
 				# Return remote mailbox list
-				$HTMLROWS_MBX = ""
-				foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
-				{
-					$HTMLROWS_MBX += "
-					<tr>
-					<th scope=`"row`">
-					<a href=`"/editremotemailbox?id=$($Item.PrimarySMTPAddress)`">$($Item.DisplayName)</a></th>
-					<td>$($Item.PrimarySMTPAddress)</td>
-					<td>$($Item.RecipientTypeDetails)</td>
-					<td>$($Item.WhenChanged)</td>
-					</tr>"
-				}
+				#$HTMLROWS_MBX = ""
+				#foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
+				#{
+				#	$HTMLROWS_MBX += "
+				#	<tr>
+				#	<th scope=`"row`">
+				#	<a href=`"/editremotemailbox?id=$($Item.PrimarySMTPAddress)`">$($Item.DisplayName)</a></th>
+				#	<td>$($Item.PrimarySMTPAddress)</td>
+				#	<td>$($Item.RecipientTypeDetails)</td>
+				#	<td>$($Item.WhenChanged)</td>
+				#	</tr>"
+				#}
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\remotemailboxes.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_MBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
@@ -162,10 +370,10 @@ try
 				# Distribution Groups Section
 
 				# Prepare Distibution Group lists split into tabs
-				$HTMLROWS_DL = ""
-				$HTMLROWS_MES = ""
-				foreach ($Item in (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated))
-				{
+				#$HTMLROWS_DL = ""
+				#$HTMLROWS_MES = ""
+				#foreach ($Item in (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated))
+				#{
 					if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup")
 					{
 						$HTMLROWS_DL += "
@@ -186,32 +394,91 @@ try
 						<td>$($Item.WhenCreated)</td>
 						</tr>"
 					}
-				}
+				#}
 
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\distributiongroups.html").Replace("<!-- {row_dl} -->", $HTMLROWS_DL).Replace("<!-- {row_mes} -->", $HTMLROWS_MES)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\distributiongroups.html").Replace("<!-- {row_dl} -->", $HTMLROWS_DL).Replace("<!-- {row_mes} -->", $HTMLROWS_MES).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 			
-			"GET /contacts"
-   { 
-				# Mail Contacts Section
-
-				# Prepare contacts list
-				$HTMLROWS = ""
-				foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
+			"GET /mailusers"
+			{ 
+				# Mail Users Section
+				# Process submitted form
+				if ($REQUEST.Url.Query)
 				{
-					$HTMLROWS += "
-					<tr>
-					<th scope=`"row`">
-					<a href=`"#`">$($Item.DisplayName)</a></th>
-					<td>$($Item.PrimarySMTPAddress)</td>
-					<td>$($Item.RecipientType)</td>
-					</tr>"
+					$Table = @{}
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
+						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
+					}
+					try
+					{
+						$Result = Enable-MailUser -Identity $Table['mailenableuser_username'] -ExternalEmailAddress $Table['mailenableuser_address'] -ErrorAction Stop
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "User $($Table['mailenableuser_username']) was enabled as Mail User with external E-Mail Address $($Table['mailenableuser_address'])")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
 				}
 
+				# Prepare contacts list
+				#$HTMLROWS = ""
+				#foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
+				#{
+				#	$HTMLROWS += "
+				#	<tr>
+				#	<th scope=`"row`">
+				#	<a href=`"#`">$($Item.DisplayName)</a></th>
+				#	<td>$($Item.PrimarySMTPAddress)</td>
+				#	<td>$($Item.RecipientType)</td>
+				#	</tr>"
+				#}
+
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\contacts.html").Replace("<!-- {row} -->", $HTMLROWS)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\mailusers.html").Replace("<!-- {row} -->", $HTMLROWS_Mailusers).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {result} -->", $HTML_RESULT)
+				break
+			}
+
+			"GET /contacts"
+			{ 
+				# Mail Contacts Section
+				if ($REQUEST.Url.Query)
+				{
+					$Table = @{}
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
+						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
+					}
+					try
+					{
+						$Result = New-MailContact -Name $Table['newmailcontact_username'] -DisplayName $Table['newmailcontact_username'] -ExternalEmailAddress $Table['newmailcontact_address'] -ErrorAction Stop
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Successfully created Mail Contact $($Table['newmailcontact_username']) with external E-Mail Address $($Table['newmailcontact_address'])")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
+				}
+
+				# Prepare contacts list
+				#$HTMLROWS = ""
+				#foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
+				#{
+				#	$HTMLROWS += "
+				#	<tr>
+				#	<th scope=`"row`">
+				#	<a href=`"#`">$($Item.DisplayName)</a></th>
+				#	<td>$($Item.PrimarySMTPAddress)</td>
+				#	<td>$($Item.RecipientType)</td>
+				#	</tr>"
+				#}
+
+				# Create response and replace template placeholders
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\contacts.html").Replace("<!-- {row} -->", $HTMLROWS_Contacts).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
@@ -219,21 +486,56 @@ try
 			{ 
 				# Email Address Policies Section
 
-				# Prepare email address policies list
-				$HTMLROWS = ""
-				foreach ($Item in (Get-EmailAddressPolicy | Select-Object Name, Priority, RecipientFilter))
+				# Process submitted form
+				if ($REQUEST.Url.Query)
 				{
-					$HTMLROWS += "
-					<tr>
-					<th scope=`"row`">
-					<a href=`"#`">$($Item.Name)</a></th>
-					<td>$($Item.Priority)</td>
-					<td>$($Item.RecipientFilter)</td>
-					</tr>"
+					$Table = @{}
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
+						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
+					}
+					try
+					{
+						$Result = New-EmailAddressPolicy -Name $Table['newemailaddresspolicy_friendlyname'] -EnabledPrimarySMTPAddressTemplate "SMTP:$($Table['newemailaddresspolicy_emailgenformat'])@$($Table['newemailaddresspolicy_domain'])" -IncludedRecipients $Table['newemailaddresspolicy_includedrecipients'] -RecipientContainer $Table['newemailaddresspolicy_recipientcontainer'] -ErrorAction Stop
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Email address policy $($Table['newemailaddresspolicy_friendlyname']) was successfully added.")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
 				}
 
+				# Prepare email address policies list
+				#$HTMLROWS = ""
+				#foreach ($Item in (Get-EmailAddressPolicy | Select-Object Name, Priority, RecipientFilter, RecipientContainer))
+				#{
+				#	$HTMLROWS += "
+				#	<tr>
+				#	<th scope=`"row`">
+				#	<a href=`"#`">$($Item.Name)</a></th>
+				#	<td>$($Item.Priority)</td>
+				#	<td>$($Item.RecipientFilter)</td>
+				#	<td>$($Item.RecipientContainer)</td>
+				#	</tr>"
+				#}
+				#
+				# Prepare accepted domain list
+				#$HTMLROWS_AD = ""
+				#foreach ($Item in (Get-AcceptedDomain))
+				#{
+				#	
+				#	if ($Item.Default)
+				#	{
+				#		$HTMLROWS_AD += "`n<option selected value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
+				#	}
+				#	else
+				#	{
+				#		$HTMLROWS_AD += "`n<option value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
+				#	}
+				#}
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\emailaddresspolicies.html").Replace("<!-- {row} -->", $HTMLROWS)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\emailaddresspolicies.html").Replace("<!-- {row} -->", $HTMLROWS_EAP).Replace("<!-- {row_domains} -->", $HTMLROWS_AD).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
@@ -252,7 +554,7 @@ try
 					try
 					{
 						$Result = New-AcceptedDomain -Name $Table['addacceptedomain_friendlyname'] -DomainName $Table['addacceptedomain_domainname'] -DomainType $Table['addacceptedomain_domaintype'] -ErrorAction Stop
-						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) was added as Accepted Domain of type $($table['addacceptedomain_domaintype']) ")
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Domain $($Table['addacceptedomain_domainname']) was successfully added as Accepted Domain of type $($table['addacceptedomain_domaintype']) ")
 					}
 					catch
 					{
@@ -262,20 +564,20 @@ try
 				}
 
 				# Prepare list of accepted domains
-				$HTMLROWS = ""
-				foreach ($Item in (Get-AcceptedDomain))
-				{
-					$HTMLROWS += "
-					<tr>
-					<th scope=`"row`">
-					<a href=`"#`">$($Item.Name)</a></th>
-					<td>$($Item.DomainName)</td>
-					<td>$($Item.DomainType)</td>
-					</tr>"
-				}
+				#$HTMLROWS = ""
+				#foreach ($Item in (Get-AcceptedDomain))
+				#{
+				#	$HTMLROWS += "
+				#	<tr>
+				#	<th scope=`"row`">
+				#	<a href=`"#`">$($Item.Name)</a></th>
+				#	<td>$($Item.DomainName)</td>
+				#	<td>$($Item.DomainType)</td>
+				#	</tr>"
+				#}
 
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\accepteddomains.html").Replace("<!-- {row} -->", $HTMLROWS).Replace("<!-- {result} -->", $HTML_RESULT)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\accepteddomains.html").Replace("<!-- {row} -->", $HTMLLIST_AD).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
