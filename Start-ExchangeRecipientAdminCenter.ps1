@@ -9,11 +9,15 @@ None
 .Outputs
 None
 .Example
-Start-ExAdminWeb.ps1
+Start-ExchangeRecipientAdminCenter.ps1
 .Notes
 Based on: WebServer - Version 1.2.2, 2022-01-19
 Based on Author: Markus Scholtes
 Based on: https://github.com/MScholtes/WebServer
+Based on work done by Steve Goodman. Thanks for all the leg work you did!
+https://practical365.com/a-new-tool-to-manage-exchange-related-attributes-without-exchange-server/
+Code forked from https://github.com/spgoodman/ExchangeRecipientAdmin
+Forked from 
 .LINK
 
 #>
@@ -316,55 +320,15 @@ try
 
 				# Prepare user list for non-Exchange users
 				$HTMLROWS_USERS = Get-NonMailboxUsers
-				#$HTMLROWS_USERS = ""
-				#foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
-				#{
-				#	$HTMLROWS_USERS += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
-				#}
 
 				# Prepare accepted domain list
 				$HTMLROWS_AD = Get-AcceptedDomains
-				#				foreach ($Item in (Get-AcceptedDomain))
-				#				{
-				#					
-				#					if ($Item.Default)
-				#     {
-				#						$HTMLROWS_AD += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-				#					}
-				#					else
-				#					{
-				#						$HTMLROWS_AD += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-				#					}
-				#				}
 
 				# Prepare remote routing domain list
 				$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
-				#foreach ($Item in (Get-AcceptedDomain))
-				#{
-				#	
-				#	if ($Item.DomainName -like "*.mail.onmicrosoft.com")
-				#	{
-				#		$HTMLROWS_RRA += "`n<option selected value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-				#	}
-				#	else
-				#	{
-				#		$HTMLROWS_RRA += "`n<option value=`"$($Item.Name)`">$($Item.DomainName)</option>"
-				#	}
-				#}
 
 				# Return remote mailbox list
 				$HTMLROWS_RMBX = Get-RemoteMailboxes
-				#foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
-				#{
-				#	$HTMLROWS_MBX += "
-				#	<tr>
-				#	<th scope=`"row`">
-				#	<a href=`"/editremotemailbox?id=$($Item.PrimarySMTPAddress)`">$($Item.DisplayName)</a></th>
-				#	<td>$($Item.PrimarySMTPAddress)</td>
-				#	<td>$($Item.RecipientTypeDetails)</td>
-				#	<td>$($Item.WhenChanged)</td>
-				#	</tr>"
-				#}
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\remotemailboxes.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_RMBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
