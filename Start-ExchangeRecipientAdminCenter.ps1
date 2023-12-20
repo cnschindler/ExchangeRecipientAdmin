@@ -14,14 +14,14 @@ Start-ExchangeRecipientAdminCenter.ps1
 Based on: WebServer - Version 1.2.2, 2022-01-19
 Based on Author: Markus Scholtes
 Based on: https://github.com/MScholtes/WebServer
+
 Based on work done by Steve Goodman. Thanks for all the leg work you did!
 https://practical365.com/a-new-tool-to-manage-exchange-related-attributes-without-exchange-server/
 Code forked from https://github.com/spgoodman/ExchangeRecipientAdmin
 Forked from 
 .LINK
-
+https://github.com/cnschindler/ExchangeRecipientAdmin
 #>
-
 
 if (!(Get-PSSnapin Microsoft.Exchange.Management.PowerShell.RecipientManagement -Registered -ErrorAction SilentlyContinue))
 {
@@ -29,8 +29,17 @@ if (!(Get-PSSnapin Microsoft.Exchange.Management.PowerShell.RecipientManagement 
 	break
 }
 
+if (!(Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue))
+{
+	throw "Please install the Active Directory PowerShell module."
+}
+
 # Load Recipient Management PowerShell Tools
 Add-PSSnapin Microsoft.Exchange.Management.PowerShell.RecipientManagement
+
+# Load Active Directory Module without PSProvider
+$Env:ADPS_LoadDefaultDrive = 0
+Import-Module ActiveDirectory -DisableNameChecking
 
 # Define webserver details
 $BASEDIR = $PSScriptRoot + "/web"
@@ -244,27 +253,21 @@ function Get-DistributionGroups
 
 function Get-NonMailGroups
 {
-	$NonMailGroups = Get-Group -Filter { (RecipientType -eq "Group") -and (RecipientTypeDetails -ne "NonUniversalGroup") -and (RecipientTypeDetails -ne "RoleGroup") }
+	$NonMailGroups = Get-ADGroup -Filter 'GroupScope -eq "Universal" -and msExchRecipientDisplayType -notlike "*"' | Select-Object SamAccountname, GroupCategory
+	#$NonMailGroups = Get-Group -Filter { (RecipientType -eq "Group") -and (RecipientTypeDetails -ne "NonUniversalGroup") -and (RecipientTypeDetails -ne "RoleGroup") }
 	$NonMailGroupsList
 	foreach ($group in $NonMailGroups)
 	{
-		$NonMailGroupsList += "`n<option value=`"$($Item.UserPrincipalName)`">$($Item.UserPrincipalName)</option>"
+		$NonMailGroupsList += "`n<option value=`"$($Group.SamAccountName)`">$($Group.SamAccountName)</option>"
 	}
 
 	Return $NonMailGroupsList
 }
 
-#$HTMLROWS_AD = Get-AcceptedDomains
-#$HTMLLIST_AD = Get-AcceptedDomains -TableView
-#$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
-#$HTMLROWS_USERS = Get-NonMailboxUsers
-#$HTMLROWS_RMBX = Get-RemoteMailboxes
-$HTMLROWS_EAP = Get-EmailAddressPolicies
-$HTMLROWS_Contacts = Get-ExternalRecipients
-$HTMLROWS_Mailusers = Get-ExternalRecipients -MailUsers
-$HTMLROWS_DL = Get-DistributionGroups
-$HTMLROWS_MES = Get-DistributionGroups -Security
-$HTMLROWS_GROUPS	
+function Set-RemoteMBX
+{
+
+}
 
 try
 {
@@ -337,37 +340,34 @@ try
 
 			"GET /distributiongroups"
 			{ 
-				# Distribution Groups Section
+				#Distribution group Section
+				# Process submitted form
+				if ($REQUEST.Url.Query)
+				{
+					$Table = @{}
+					foreach ($Item in [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?", ""))).Split("&"))
+					{
+						$Table.Add($Item.Split("=")[0], $Item.Split("=")[1])
+					}
+					try
+					{
+						$Result = Enable-DistributionGroup -Identity $Table['mailenablegroup_identity'] -ErrorAction Stop
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "Successfully mail-enabled Group $($Table['mailenablegroup_identity'])")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
+				}
 
 				# Prepare Distibution Group lists split into tabs
-				#$HTMLROWS_DL = ""
-				#$HTMLROWS_MES = ""
-				#foreach ($Item in (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated))
-				#{
-				if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup")
-				{
-					$HTMLROWS_DL += "
-						<tr>
-						<th scope=`"row`">
-						<a href=`"#`">$($Item.DisplayName)</a></th>
-						<td>$($Item.PrimarySMTPAddress)</td>
-						<td>$($Item.WhenCreated)</td>
-						</tr>"
-				}
-				elseif ($Item.RecipientTypeDetails -eq "MailUniversalSecurityGroup")
-				{
-					$HTMLROWS_MES += "
-						<tr>
-						<th scope=`"row`">
-						<a href=`"#`">$($Item.DisplayName)</a></th>
-						<td>$($Item.PrimarySMTPAddress)</td>
-						<td>$($Item.WhenCreated)</td>
-						</tr>"
-				}
-				#}
+				$HTMLROWS_DL = Get-DistributionGroups
+				$HTMLROWS_MES = Get-DistributionGroups -Security
+				$HTMLROWS_GROUPS = Get-NonMailGroups
 
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\distributiongroups.html").Replace("<!-- {row_dl} -->", $HTMLROWS_DL).Replace("<!-- {row_mes} -->", $HTMLROWS_MES).Replace("<!-- {result} -->", $HTML_RESULT)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\distributiongroups.html").Replace("<!-- {row_dl} -->", $HTMLROWS_DL).Replace("<!-- {row_mes} -->", $HTMLROWS_MES).Replace("<!-- {row_groups} -->", $HTMLROWS_GROUPS).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 			
@@ -394,18 +394,8 @@ try
 					
 				}
 
-				# Prepare contacts list
-				#$HTMLROWS = ""
-				#foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
-				#{
-				#	$HTMLROWS += "
-				#	<tr>
-				#	<th scope=`"row`">
-				#	<a href=`"#`">$($Item.DisplayName)</a></th>
-				#	<td>$($Item.PrimarySMTPAddress)</td>
-				#	<td>$($Item.RecipientType)</td>
-				#	</tr>"
-				#}
+				# Prepare mail users list
+				$HTMLROWS_Mailusers = Get-ExternalRecipients -MailUsers
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\mailusers.html").Replace("<!-- {row} -->", $HTMLROWS_Mailusers).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {result} -->", $HTML_RESULT)
@@ -435,17 +425,7 @@ try
 				}
 
 				# Prepare contacts list
-				#$HTMLROWS = ""
-				#foreach ($Item in (Get-MailContact | Select-Object DisplayName, PrimarySMTPAddress, RecipientType))
-				#{
-				#	$HTMLROWS += "
-				#	<tr>
-				#	<th scope=`"row`">
-				#	<a href=`"#`">$($Item.DisplayName)</a></th>
-				#	<td>$($Item.PrimarySMTPAddress)</td>
-				#	<td>$($Item.RecipientType)</td>
-				#	</tr>"
-				#}
+				$HTMLROWS_Contacts = Get-ExternalRecipients
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\contacts.html").Replace("<!-- {row} -->", $HTMLROWS_Contacts).Replace("<!-- {result} -->", $HTML_RESULT)
@@ -477,33 +457,11 @@ try
 				}
 
 				# Prepare email address policies list
-				#$HTMLROWS = ""
-				#foreach ($Item in (Get-EmailAddressPolicy | Select-Object Name, Priority, RecipientFilter, RecipientContainer))
-				#{
-				#	$HTMLROWS += "
-				#	<tr>
-				#	<th scope=`"row`">
-				#	<a href=`"#`">$($Item.Name)</a></th>
-				#	<td>$($Item.Priority)</td>
-				#	<td>$($Item.RecipientFilter)</td>
-				#	<td>$($Item.RecipientContainer)</td>
-				#	</tr>"
-				#}
-				#
+				$HTMLROWS_EAP = Get-EmailAddressPolicies
+
 				# Prepare accepted domain list
-				#$HTMLROWS_AD = ""
-				#foreach ($Item in (Get-AcceptedDomain))
-				#{
-				#	
-				#	if ($Item.Default)
-				#	{
-				#		$HTMLROWS_AD += "`n<option selected value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
-				#	}
-				#	else
-				#	{
-				#		$HTMLROWS_AD += "`n<option value=`"$($Item.DomainName)`">$($Item.DomainName)</option>"
-				#	}
-				#}
+				$HTMLROWS_AD = Get-AcceptedDomains
+
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\emailaddresspolicies.html").Replace("<!-- {row} -->", $HTMLROWS_EAP).Replace("<!-- {row_domains} -->", $HTMLROWS_AD).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
@@ -534,17 +492,7 @@ try
 				}
 
 				# Prepare list of accepted domains
-				#$HTMLROWS = ""
-				#foreach ($Item in (Get-AcceptedDomain))
-				#{
-				#	$HTMLROWS += "
-				#	<tr>
-				#	<th scope=`"row`">
-				#	<a href=`"#`">$($Item.Name)</a></th>
-				#	<td>$($Item.DomainName)</td>
-				#	<td>$($Item.DomainType)</td>
-				#	</tr>"
-				#}
+				$HTMLROWS_AD = Get-AcceptedDomains
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\accepteddomains.html").Replace("<!-- {row} -->", $HTMLLIST_AD).Replace("<!-- {result} -->", $HTML_RESULT)
