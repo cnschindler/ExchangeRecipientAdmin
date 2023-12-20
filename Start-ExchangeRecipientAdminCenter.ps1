@@ -113,18 +113,22 @@ function Get-NonMailboxUsers
 
 function Get-RemoteMailboxes
 {
+	$RemoteMailboxes = Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged
+
 	$RemoteMBX = ""
-	foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
+	foreach ($MBX in $RemoteMailboxes)
 	{
 		$RemoteMBX += "
 		<tr>
 		<th scope=`"row`">
-		<a href=`"/editremotemailbox?id=$($Item.PrimarySMTPAddress)`">$($Item.DisplayName)</a></th>
-		<td>$($Item.PrimarySMTPAddress)</td>
-		<td>$($Item.RecipientTypeDetails)</td>
-		<td>$($Item.WhenChanged)</td>
+		<a href=`"/editremotemailbox?id=$($MBX.PrimarySMTPAddress)`">$($MBX.DisplayName)</a></th>
+		<td>$($MBX.PrimarySMTPAddress)</td>
+		<td>$($MBX.RecipientTypeDetails)</td>
+		<td>$($MBX.WhenChanged)</td>
 		</tr>"
 	}
+
+	Return $RemoteMBX
 }
 
 function Get-EmailAddressPolicies
@@ -236,7 +240,7 @@ function Get-DistributionGroups
 
 function Get-NonMailGroups
 {
-	$NonMailGroups = Get-Group -Filter {(RecipientType -eq "Group") -and (RecipientTypeDetails -ne "NonUniversalGroup") -and (RecipientTypeDetails -ne "RoleGroup")}
+	$NonMailGroups = Get-Group -Filter { (RecipientType -eq "Group") -and (RecipientTypeDetails -ne "NonUniversalGroup") -and (RecipientTypeDetails -ne "RoleGroup") }
 	$NonMailGroupsList
 	foreach ($group in $NonMailGroups)
 	{
@@ -246,17 +250,18 @@ function Get-NonMailGroups
 	Return $NonMailGroupsList
 }
 
-$HTMLROWS_AD = Get-AcceptedDomains
-$HTMLLIST_AD = Get-AcceptedDomains -TableView
-$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
-$HTMLROWS_USERS = Get-NonMailboxUsers
-$HTMLROWS_MBX = Get-RemoteMailboxes
+#$HTMLROWS_AD = Get-AcceptedDomains
+#$HTMLLIST_AD = Get-AcceptedDomains -TableView
+#$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
+#$HTMLROWS_USERS = Get-NonMailboxUsers
+#$HTMLROWS_RMBX = Get-RemoteMailboxes
 $HTMLROWS_EAP = Get-EmailAddressPolicies
 $HTMLROWS_Contacts = Get-ExternalRecipients
 $HTMLROWS_Mailusers = Get-ExternalRecipients -MailUsers
 $HTMLROWS_DL = Get-DistributionGroups
 $HTMLROWS_MES = Get-DistributionGroups -Security
 $HTMLROWS_GROUPS	
+
 try
 {
 	"$(Get-Date -Format s) Powershell webserver started."
@@ -310,6 +315,7 @@ try
 				}
 
 				# Prepare user list for non-Exchange users
+				$HTMLROWS_USERS = Get-NonMailboxUsers
 				#$HTMLROWS_USERS = ""
 				#foreach ($Item in (Get-User -Filter "RecipientType -eq 'User' -and RecipientTypeDetails -ne 'DisabledUser'" | Where-Object { $_.UserPrincipalName }))
 				#{
@@ -317,7 +323,7 @@ try
 				#}
 
 				# Prepare accepted domain list
-				#$HTMLROWS_AD = Get-AcceptedDomains
+				$HTMLROWS_AD = Get-AcceptedDomains
 				#				foreach ($Item in (Get-AcceptedDomain))
 				#				{
 				#					
@@ -332,7 +338,7 @@ try
 				#				}
 
 				# Prepare remote routing domain list
-				#$HTMLROWS_RRA = ""
+				$HTMLROWS_RRA = Get-AcceptedDomains -RemoteRouting
 				#foreach ($Item in (Get-AcceptedDomain))
 				#{
 				#	
@@ -347,7 +353,7 @@ try
 				#}
 
 				# Return remote mailbox list
-				#$HTMLROWS_MBX = ""
+				$HTMLROWS_RMBX = Get-RemoteMailboxes
 				#foreach ($Item in (Get-RemoteMailbox | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenChanged))
 				#{
 				#	$HTMLROWS_MBX += "
@@ -361,7 +367,7 @@ try
 				#}
 
 				# Create response and replace template placeholders
-				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\remotemailboxes.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_MBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\remotemailboxes.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_RMBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
@@ -374,26 +380,26 @@ try
 				#$HTMLROWS_MES = ""
 				#foreach ($Item in (Get-DistributionGroup | Select-Object DisplayName, PrimarySMTPAddress, RecipientTypeDetails, WhenCreated))
 				#{
-					if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup")
-					{
-						$HTMLROWS_DL += "
+				if ($Item.RecipientTypeDetails -eq "MailUniversalDistributionGroup")
+				{
+					$HTMLROWS_DL += "
 						<tr>
 						<th scope=`"row`">
 						<a href=`"#`">$($Item.DisplayName)</a></th>
 						<td>$($Item.PrimarySMTPAddress)</td>
 						<td>$($Item.WhenCreated)</td>
 						</tr>"
-					}
-					elseif ($Item.RecipientTypeDetails -eq "MailUniversalSecurityGroup")
-					{
-						$HTMLROWS_MES += "
+				}
+				elseif ($Item.RecipientTypeDetails -eq "MailUniversalSecurityGroup")
+				{
+					$HTMLROWS_MES += "
 						<tr>
 						<th scope=`"row`">
 						<a href=`"#`">$($Item.DisplayName)</a></th>
 						<td>$($Item.PrimarySMTPAddress)</td>
 						<td>$($Item.WhenCreated)</td>
 						</tr>"
-					}
+				}
 				#}
 
 				# Create response and replace template placeholders
