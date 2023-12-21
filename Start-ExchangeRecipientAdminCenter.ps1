@@ -133,7 +133,7 @@ function Get-RemoteMailboxes
 	{
 		$RemoteMBX += "
 		<tr>
-		<th scope=`"row`">
+		<td>$($MBX.DisplayName)</td>
 		<td>$($MBX.PrimarySMTPAddress)</td>
 		<td>$($MBX.RecipientTypeDetails)</td>
 		<td>$($MBX.WhenChanged)</td>
@@ -141,6 +141,7 @@ function Get-RemoteMailboxes
 	}
 
 	# Item referenced as http link
+	# <th scope=`"row`">
 	# <a href=`"/getremotemailbox?id=$($MBX.PrimarySMTPAddress)`">$($MBX.DisplayName)</a></th>
 
 	Return $RemoteMBX
