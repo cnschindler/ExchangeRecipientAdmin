@@ -134,7 +134,7 @@ function Get-RemoteMailboxes
 		$RemoteMBX += "
 		<tr>
 		<th scope=`"row`">
-		<a href=`"/editremotemailbox?id=$($MBX.PrimarySMTPAddress)`">$($MBX.DisplayName)</a></th>
+		<a href=`"/getremotemailbox?id=$($MBX.PrimarySMTPAddress)`">$($MBX.DisplayName)</a></th>
 		<td>$($MBX.PrimarySMTPAddress)</td>
 		<td>$($MBX.RecipientTypeDetails)</td>
 		<td>$($MBX.WhenChanged)</td>
@@ -335,6 +335,50 @@ try
 
 				# Create response and replace template placeholders
 				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\remotemailboxes.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_RMBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
+				break
+			}
+
+			"GET /getremotemailbox"
+			{
+				if ($REQUEST.Url.Query)
+				{
+					$RMBX = [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?id=", "")))
+					try
+					{
+						$Result = Get-RemoteMailbox -Identity $RMBX -ErrorAction Stop
+						#$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "User $($Table['username']) enabled as Remote Mailbox")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
+				}
+
+				# Create response and replace template placeholders
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\getremotemailbox.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_RMBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
+				break
+			}
+
+			"GET /setremotemailbox"
+			{
+				if ($REQUEST.Url.Query)
+				{
+					$RMBX = [URI]::UnescapeDataString(($REQUEST.Url.Query.Replace("?id=", "")))
+					try
+					{
+						$Result = Get-RemoteMailbox -Identity $RMBX -ErrorAction Stop
+						$HTML_RESULT = $HTML_SUCCESS.Replace("{result}", "User $($Table['username']) enabled as Remote Mailbox")
+					}
+					catch
+					{
+						$HTML_RESULT = $HTML_WARN.Replace("{result}", $Error -join "<br />")
+					}
+					
+				}
+
+				# Create response and replace template placeholders
+				$HTMLRESPONSE = (Get-Content -Path "$($BASEDIR)\getremotemailbox.html").Replace("<!-- {row_mbx} -->", $HTMLROWS_RMBX).Replace("<!-- {row_ad} -->", $HTMLROWS_AD).Replace("<!-- {row_user} -->", $HTMLROWS_USERS).Replace("<!-- {row_rra} -->", $HTMLROWS_RRA).Replace("<!-- {result} -->", $HTML_RESULT)
 				break
 			}
 
